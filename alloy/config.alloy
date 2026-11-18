@@ -1,0 +1,64 @@
+// Copy selected internal labels before the syslog source removes them.
+loki.relabel "syslog" {
+	forward_to = []
+
+	rule {
+		source_labels = ["__syslog_message_hostname"]
+		target_label  = "hostname"
+	}
+
+	rule {
+		source_labels = ["__syslog_message_app_name"]
+		target_label  = "app"
+	}
+
+	rule {
+		source_labels = ["__syslog_message_severity"]
+		target_label  = "severity"
+	}
+
+	rule {
+		source_labels = ["__syslog_message_facility"]
+		target_label  = "facility"
+	}
+}
+
+loki.source.syslog "receiver" {
+	listener {
+		address       = "0.0.0.0:1514"
+		protocol      = "tcp"
+		syslog_format = "rfc3164"
+		labels        = {job = "syslog", format = "rfc3164", transport = "tcp"}
+	}
+
+	listener {
+		address       = "0.0.0.0:1514"
+		protocol      = "udp"
+		syslog_format = "rfc3164"
+		labels        = {job = "syslog", format = "rfc3164", transport = "udp"}
+	}
+
+	listener {
+		address       = "0.0.0.0:1515"
+		protocol      = "tcp"
+		syslog_format = "rfc5424"
+		labels        = {job = "syslog", format = "rfc5424", transport = "tcp"}
+	}
+
+	listener {
+		address       = "0.0.0.0:1515"
+		protocol      = "udp"
+		syslog_format = "rfc5424"
+		labels        = {job = "syslog", format = "rfc5424", transport = "udp"}
+	}
+
+	// Use receipt time so devices with incorrect clocks still appear in Explore.
+	relabel_rules = loki.relabel.syslog.rules
+	forward_to    = [loki.write.lgtm.receiver]
+}
+
+loki.write "lgtm" {
+	endpoint {
+		url = "http://lgtm:3100/loki/api/v1/push"
+	}
+}
